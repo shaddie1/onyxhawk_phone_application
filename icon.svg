@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="110" fill="#c9a227"/>
+  <!-- Hawk silhouette body -->
+  <ellipse cx="256" cy="290" rx="70" ry="90" fill="#0c0c0c"/>
+  <!-- Wings spread -->
+  <path d="M186 240 C140 200 80 210 60 250 C90 240 130 260 186 290 Z" fill="#0c0c0c"/>
+  <path d="M326 240 C372 200 432 210 452 250 C422 240 382 260 326 290 Z" fill="#0c0c0c"/>
+  <!-- Head -->
+  <circle cx="256" cy="190" r="44" fill="#0c0c0c"/>
+  <!-- Beak -->
+  <path d="M256 210 L240 230 L268 222 Z" fill="#c9a227"/>
+  <!-- Eye -->
+  <circle cx="268" cy="183" r="7" fill="#c9a227"/>
+  <circle cx="270" cy="181" r="3" fill="#0c0c0c"/>
+  <!-- Tail feathers -->
+  <path d="M220 370 L256 340 L292 370 L280 380 L256 355 L232 380 Z" fill="#0c0c0c"/>
+  <!-- Talons -->
+  <path d="M230 375 L220 400 M245 378 L240 405 M267 378 L272 405 M282 375 L292 400" stroke="#0c0c0c" stroke-width="6" stroke-linecap="round"/>
+</svg>
