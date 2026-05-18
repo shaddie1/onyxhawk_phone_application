@@ -150,9 +150,9 @@ function Landing({ go }) {
         onError={e => e.target.style.display='none'}>
         <source src="bg-video.mp4" type="video/mp4"/>
       </video>
-      {/* Animated gradient overlay — always on, dims video when present */}
-      <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(135deg,rgba(12,12,12,0.94) 0%,rgba(26,18,0,0.88) 50%,rgba(12,12,12,0.94) 100%)', backgroundSize:'300% 300%', animation:'bgpulse 14s ease-in-out infinite' }}/>
-      <div style={{ position:'absolute', inset:0, zIndex:2, background:'radial-gradient(ellipse at 50% 22%,rgba(201,162,39,0.22) 0%,transparent 65%)', animation:'glowpulse 6s ease-in-out infinite' }}/>
+      {/* White overlay */}
+      <div style={{ position:'absolute', inset:0, zIndex:1, background:'linear-gradient(135deg,rgba(255,255,255,0.90) 0%,rgba(255,252,235,0.85) 50%,rgba(255,255,255,0.90) 100%)', backgroundSize:'300% 300%', animation:'bgpulse 14s ease-in-out infinite' }}/>
+      <div style={{ position:'absolute', inset:0, zIndex:2, background:'radial-gradient(ellipse at 50% 22%,rgba(201,162,39,0.18) 0%,transparent 65%)', animation:'glowpulse 6s ease-in-out infinite' }}/>
 
       {/* Scrollable content */}
       <div style={{ position:'relative', zIndex:3, flex:1, overflowY:'auto', display:'flex', flexDirection:'column', alignItems:'center', padding:'52px 28px 48px' }}>
@@ -162,20 +162,20 @@ function Landing({ go }) {
           <div style={{ width:90, height:90, borderRadius:26, border:`2px solid ${G}`, overflow:'hidden', marginBottom:16, boxShadow:`0 0 40px ${G}66, 0 8px 32px rgba(0,0,0,0.7)` }}>
             <img src="logo.jpg" alt="Onyxhawk logo" style={{ width:'100%', height:'100%', objectFit:'cover' }}/>
           </div>
-          <div style={{ fontSize:36, fontWeight:900, color:'#fff', letterSpacing:-1, textShadow:'0 2px 24px rgba(0,0,0,0.9)' }}>
+          <div style={{ fontSize:36, fontWeight:900, color:'#111', letterSpacing:-1, textShadow:'0 1px 8px rgba(255,255,255,0.6)' }}>
             Onyx<span style={{ color:G }}>hawk</span>
           </div>
-          <div style={{ fontSize:10, color:'rgba(255,255,255,0.52)', letterSpacing:3.5, textTransform:'uppercase', marginTop:6 }}>
+          <div style={{ fontSize:10, color:'rgba(0,0,0,0.5)', letterSpacing:3.5, textTransform:'uppercase', marginTop:6 }}>
             Cleaning Service · Nairobi
           </div>
         </div>
 
         {/* Vision / Description */}
         <div style={{ textAlign:'center', marginBottom:28 }}>
-          <h1 style={{ fontSize:22, fontWeight:800, color:'#fff', lineHeight:1.38, marginBottom:12, textShadow:'0 2px 16px rgba(0,0,0,0.8)' }}>
+          <h1 style={{ fontSize:22, fontWeight:800, color:'#111', lineHeight:1.38, marginBottom:12, textShadow:'0 1px 6px rgba(255,255,255,0.5)' }}>
             Spotless Spaces.<br/><span style={{ color:G }}>Every Time.</span>
           </h1>
-          <p style={{ fontSize:13, color:'rgba(255,255,255,0.6)', lineHeight:1.8, maxWidth:290, margin:'0 auto' }}>
+          <p style={{ fontSize:13, color:'rgba(0,0,0,0.6)', lineHeight:1.8, maxWidth:290, margin:'0 auto' }}>
             Nairobi's most trusted cleaning service — vetted & insured professionals for homes, offices, and commercial spaces. Satisfaction guaranteed.
           </p>
         </div>
@@ -185,7 +185,7 @@ function Landing({ go }) {
           <div style={{ fontSize:22, flexShrink:0 }}>{ad.ic}</div>
           <div style={{ flex:1, minWidth:0 }}>
             <div style={{ fontSize:12, fontWeight:700, color:G }}>{ad.title}</div>
-            <div style={{ fontSize:11, color:'rgba(255,255,255,0.65)', marginTop:3, lineHeight:1.4 }}>{ad.desc}</div>
+            <div style={{ fontSize:11, color:'rgba(0,0,0,0.6)', marginTop:3, lineHeight:1.4 }}>{ad.desc}</div>
           </div>
           <div style={{ flexShrink:0, fontSize:8, fontWeight:700, color:'#000', background:G, padding:'4px 9px', borderRadius:6, letterSpacing:0.3, textTransform:'uppercase' }}>{ad.badge}</div>
         </div>
@@ -193,7 +193,7 @@ function Landing({ go }) {
         {/* Progress dots */}
         <div style={{ display:'flex', gap:5, marginBottom:28 }}>
           {ADS.map((_, i) => (
-            <div key={i} style={{ width: i===adIdx ? 20 : 6, height:5, borderRadius:3, background: i===adIdx ? G : 'rgba(255,255,255,0.22)', transition:'all 0.4s ease' }}/>
+            <div key={i} style={{ width: i===adIdx ? 20 : 6, height:5, borderRadius:3, background: i===adIdx ? G : 'rgba(0,0,0,0.18)', transition:'all 0.4s ease' }}/>
           ))}
         </div>
 
@@ -204,11 +204,11 @@ function Landing({ go }) {
             Book a Service
           </button>
           <button className="ox-btn" onClick={() => go('signin')}
-            style={{ width:'100%', padding:'15px', background:'rgba(255,255,255,0.08)', border:'1px solid rgba(255,255,255,0.2)', borderRadius:14, color:'#fff', fontSize:15, fontWeight:600 }}>
+            style={{ width:'100%', padding:'15px', background:'rgba(0,0,0,0.07)', border:'1px solid rgba(0,0,0,0.18)', borderRadius:14, color:'#111', fontSize:15, fontWeight:600 }}>
             Sign In
           </button>
           <div style={{ textAlign:'center', padding:'2px 0' }}>
-            <span style={{ fontSize:13, color:'rgba(255,255,255,0.45)' }}>Don't have an account? </span>
+            <span style={{ fontSize:13, color:'rgba(0,0,0,0.5)' }}>Don't have an account? </span>
             <span onClick={() => go('signup')} style={{ fontSize:13, color:G, fontWeight:700, cursor:'pointer' }}>Sign Up</span>
           </div>
           <button className="ox-btn" onClick={() => go('cleaner')}
