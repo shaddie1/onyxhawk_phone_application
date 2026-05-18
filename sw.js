@@ -1,5 +1,5 @@
-/* Onyxhawk Cleaning Service — Service Worker v1.4 */
-const CACHE = 'onyxhawk-v4';
+/* Onyxhawk Cleaning Service — Service Worker v1.5 */
+const CACHE = 'onyxhawk-v5';
 const CDN = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',

@@ -23,17 +23,27 @@
 
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; overflow: hidden; background: #0c0c0c; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
-    body { color: #f0f0f0; }
+    :root {
+      --BG: #0c0c0c; --CARD: #181818; --CARD2: #212121;
+      --TX: #f0f0f0; --MU: #666; --BO: #2c2c2c; --nav-bg: #111;
+    }
+    body.light-mode {
+      --BG: #f4f4f4; --CARD: #ffffff; --CARD2: #ebebeb;
+      --TX: #111111; --MU: #888; --BO: #ddd; --nav-bg: #ffffff;
+    }
+    html, body { height: 100%; overflow: hidden; background: var(--BG); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; }
+    body { color: var(--TX); }
     #app { height: 100dvh; height: 100vh; max-width: 480px; margin: 0 auto; display: flex; flex-direction: column; position: relative; overflow: hidden; }
     .content { flex: 1; overflow-y: auto; overflow-x: hidden; -webkit-overflow-scrolling: touch; }
     .content.chat-mode { display: flex; flex-direction: column; overflow: hidden; }
-    .bottom-nav { flex-shrink: 0; height: 72px; background: #111; border-top: 1px solid #2c2c2c; display: flex; padding-bottom: env(safe-area-inset-bottom); }
+    .bottom-nav { flex-shrink: 0; height: 72px; background: var(--nav-bg); border-top: 1px solid var(--BO); display: flex; padding-bottom: env(safe-area-inset-bottom); }
     .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; border: none; background: none; cursor: pointer; font-size: 9px; font-family: inherit; transition: opacity 0.15s; }
     .nav-btn:active { opacity: 0.7; }
     input, textarea, button { font-family: inherit; }
     input::placeholder, textarea::placeholder { color: #555; }
+    body.light-mode input::placeholder, body.light-mode textarea::placeholder { color: #aaa; }
     input[type="date"] { color-scheme: dark; }
+    body.light-mode input[type="date"] { color-scheme: light; }
     textarea { resize: none; }
     ::-webkit-scrollbar { display: none; }
     .ox-btn { border: none; cursor: pointer; transition: transform 0.1s; }
@@ -48,7 +58,7 @@
 
     /* Desktop centering decoration */
     @media (min-width: 480px) {
-      body { background: #080808; }
+      body { background: var(--BG); }
       #app { box-shadow: 0 0 60px rgba(0,0,0,0.8); }
     }
   </style>
@@ -77,9 +87,9 @@ const CONFIG = {
 
 const { useState, useRef, useEffect } = React;
 
-const G = '#c9a227', GD = '#7a6010', BG = '#0c0c0c',
-      CARD = '#181818', CARD2 = '#212121',
-      TX = '#f0f0f0', MU = '#666', BO = '#2c2c2c', OK = '#4caf7d';
+const G = '#c9a227', GD = '#7a6010', OK = '#4caf7d',
+      BG   = 'var(--BG)',   CARD  = 'var(--CARD)',  CARD2 = 'var(--CARD2)',
+      TX   = 'var(--TX)',   MU    = 'var(--MU)',     BO    = 'var(--BO)';
 
 const SVCS = [
   { id:1, ic:'🏠', name:'Residential',       desc:'Homes & apartments',          price:'From KES 3,500' },
@@ -433,6 +443,85 @@ function Rewards({ user, saveUser, go }) {
   );
 }
 
+/* ─── ACCOUNT SCREEN ─── */
+function Account({ user, saveUser, go, theme, setTheme }) {
+  const isDark = theme === 'dark';
+  const handleSignOut = () => { saveUser(null); go('home'); };
+
+  return (
+    <div style={{ padding:'24px 22px 48px' }}>
+      <div style={{ fontSize:9, color:G, letterSpacing:2, textTransform:'uppercase', marginBottom:4 }}>Profile</div>
+      <h2 style={{ fontSize:24, fontWeight:800, color:TX, marginBottom:20, letterSpacing:-0.3 }}>My Account</h2>
+
+      {/* Profile card */}
+      {user ? (
+        <div style={{ background:CARD, border:`1px solid ${BO}`, borderRadius:16, padding:'18px 18px', marginBottom:14, display:'flex', alignItems:'center', gap:14 }}>
+          <div style={{ width:58, height:58, borderRadius:29, background:`${G}22`, border:`2px solid ${G}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:26, flexShrink:0 }}>👤</div>
+          <div style={{ flex:1, minWidth:0 }}>
+            <div style={{ fontSize:17, fontWeight:800, color:TX, letterSpacing:-0.2 }}>{user.name}</div>
+            {user.phone && <div style={{ fontSize:12, color:MU, marginTop:3 }}>{user.phone}</div>}
+            {user.email && <div style={{ fontSize:11, color:MU }}>{user.email}</div>}
+          </div>
+        </div>
+      ) : (
+        <div style={{ background:CARD, border:`1px solid ${BO}`, borderRadius:16, padding:'22px', marginBottom:14, textAlign:'center' }}>
+          <div style={{ fontSize:38, marginBottom:10 }}>👤</div>
+          <div style={{ fontSize:15, fontWeight:700, color:TX, marginBottom:6 }}>Not signed in</div>
+          <div style={{ fontSize:12, color:MU, marginBottom:18, lineHeight:1.6 }}>Sign in to manage bookings and earn loyalty points</div>
+          <button className="ox-btn" onClick={() => go('signin')}
+            style={{ width:'100%', padding:'13px', background:G, borderRadius:12, color:'#000', fontSize:14, fontWeight:700, marginBottom:8 }}>
+            Sign In
+          </button>
+          <button className="ox-btn" onClick={() => go('signup')}
+            style={{ width:'100%', padding:'13px', background:'transparent', border:`1px solid ${BO}`, borderRadius:12, color:TX, fontSize:14 }}>
+            Create Account
+          </button>
+        </div>
+      )}
+
+      {/* Points summary — only when logged in */}
+      {user && (
+        <div style={{ background:'linear-gradient(135deg,#1a1200,#2a1e00)', border:`1px solid ${GD}`, borderRadius:16, padding:'18px 20px', marginBottom:14 }}>
+          <div style={{ fontSize:9, color:G, letterSpacing:2, textTransform:'uppercase', marginBottom:6 }}>Loyalty Points</div>
+          <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <div>
+              <div style={{ fontSize:40, fontWeight:900, color:G, lineHeight:1 }}>{(user.points||0).toLocaleString()}</div>
+              <div style={{ fontSize:11, color:'#aaa', marginTop:5 }}>Total earned: {(user.totalEarned||0).toLocaleString()} pts</div>
+            </div>
+            <button className="ox-btn" onClick={() => go('rewards')}
+              style={{ padding:'10px 15px', background:G, borderRadius:10, color:'#000', fontSize:12, fontWeight:700, flexShrink:0 }}>
+              Redeem →
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Appearance toggle */}
+      <div style={{ background:CARD, border:`1px solid ${BO}`, borderRadius:16, padding:'18px 20px', marginBottom:14 }}>
+        <div style={{ fontSize:12, fontWeight:700, color:TX, marginBottom:14 }}>Appearance</div>
+        <div style={{ display:'flex', gap:10 }}>
+          <button className="ox-btn" onClick={() => setTheme('dark')}
+            style={{ flex:1, padding:'12px', borderRadius:12, background: isDark ? G : CARD2, border:`1px solid ${isDark ? G : BO}`, color: isDark ? '#000' : TX, fontSize:13, fontWeight: isDark ? 700 : 400 }}>
+            🌙 Dark
+          </button>
+          <button className="ox-btn" onClick={() => setTheme('light')}
+            style={{ flex:1, padding:'12px', borderRadius:12, background: !isDark ? G : CARD2, border:`1px solid ${!isDark ? G : BO}`, color: !isDark ? '#000' : TX, fontSize:13, fontWeight: !isDark ? 700 : 400 }}>
+            ☀️ Light
+          </button>
+        </div>
+      </div>
+
+      {/* Sign out */}
+      {user && (
+        <button className="ox-btn" onClick={handleSignOut}
+          style={{ width:'100%', padding:'14px', background:'transparent', border:'1px solid #e24b4a55', borderRadius:12, color:'#e24b4a', fontSize:14, fontWeight:600 }}>
+          Sign Out
+        </button>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main App ─── */
 function App() {
   const [screen, setScreen]   = useState('landing');
@@ -446,8 +535,19 @@ function App() {
   const [aiLoad,  setAiLoad]  = useState(false);
   const [user,    setUser]    = useState(() => { try { return JSON.parse(localStorage.getItem('onyxhawk_user')) || null; } catch { return null; } });
   const [lastPts, setLastPts] = useState(0);
+  const [theme,   setThemeRaw] = useState(() => {
+    const saved = localStorage.getItem('onyxhawk_theme') || 'dark';
+    if (saved === 'light') document.body.classList.add('light-mode');
+    return saved;
+  });
   const chatEnd  = useRef(null);
   const contentRef = useRef(null);
+
+  const setTheme = (t) => {
+    setThemeRaw(t);
+    localStorage.setItem('onyxhawk_theme', t);
+    document.body.classList.toggle('light-mode', t === 'light');
+  };
 
   const saveUser = (u) => {
     setUser(u);
@@ -814,11 +914,11 @@ function App() {
 
   /* ─── NAV ─── */
   const NAV = [
-    { id:'home',     ic:'🏠', lb:'Home'     },
-    { id:'services', ic:'🗂️', lb:'Services' },
-    { id:'book',     ic:'📅', lb:'Book'     },
-    { id:'chat',     ic:'🤖', lb:'Hawk AI'  },
-    { id:'rewards',  ic:'⭐', lb:'Rewards'  },
+    { id:'home',     ic:'🏠', lb:'Home'    },
+    { id:'book',     ic:'📅', lb:'Book'    },
+    { id:'chat',     ic:'🤖', lb:'Hawk AI' },
+    { id:'rewards',  ic:'⭐', lb:'Rewards' },
+    { id:'account',  ic:'👤', lb:'Account' },
   ];
 
   const isChat = screen === 'chat';
@@ -832,6 +932,7 @@ function App() {
         {screen === 'signup'   && <SignUp   go={go} onAuth={saveUser}/>}
         {screen === 'cleaner'  && <BecomeACleaner go={go}/>}
         {screen === 'rewards'  && <Rewards  user={user} saveUser={saveUser} go={go}/>}
+        {screen === 'account'  && <Account  user={user} saveUser={saveUser} go={go} theme={theme} setTheme={setTheme}/>}
         {screen === 'home'     && <Home/>}
         {screen === 'services' && <Services/>}
         {screen === 'book'     && <Book/>}
