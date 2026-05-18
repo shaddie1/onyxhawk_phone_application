@@ -1,5 +1,5 @@
-/* Onyxhawk Cleaning Service — Service Worker v1.1 */
-const CACHE = 'onyxhawk-v1';
+/* Onyxhawk Cleaning Service — Service Worker v1.2 */
+const CACHE = 'onyxhawk-v2';
 const CDN = [
   'https://unpkg.com/react@18/umd/react.production.min.js',
   'https://unpkg.com/react-dom@18/umd/react-dom.production.min.js',
@@ -9,9 +9,7 @@ const STATIC = [
   './',
   './index.html',
   './manifest.json',
-  './icon.svg',
-  './icons/icon-192.png',
-  './icons/icon-512.png'
+  './logo.jpg'
 ];
 
 self.addEventListener('install', e => {
