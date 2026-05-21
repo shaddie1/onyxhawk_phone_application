@@ -77,11 +77,15 @@
 const CONFIG = {
   businessName:  'Onyxhawk Cleaning Service',
   phone:         '+254 115247988',   // ← your WhatsApp/phone
-  whatsapp:      '254115247988',        // ← digits only for WhatsApp link
+  whatsapp:      '254115247988',      // ← digits only for WhatsApp link
   website:       'https://shaddie1.github.io/onyxhawks-cleaning-service',
   nairobi:       true,
+  mpesaPaybill:  '123456',           // ← replace with your actual Paybill number
+  mpesaBusiness: 'Onyxhawk Cleaning',
+  mpesaNotes:    'Service Booking',
   ANTHROPIC_KEY: '',   // ← paste your Anthropic API key here for Hawk AI chat
                        //   get one at https://console.anthropic.com
+  darajaApi: 'http://localhost:3000',  // ← URL of your running server.js proxy
 };
 /* ═══════════════════════════════════════════════════ */
 
@@ -92,12 +96,12 @@ const G = '#b8911f', GD = '#7a6010', OK = '#4caf7d',
       TX   = 'var(--TX)',   MU    = 'var(--MU)',     BO    = 'var(--BO)';
 
 const SVCS = [
-  { id:1, ic:'🏠', name:'Residential',       desc:'Homes & apartments',          price:'From KES 3,500' },
-  { id:2, ic:'🏢', name:'Commercial',         desc:'Offices & workspaces',         price:'From KES 8,000' },
-  { id:3, ic:'✨', name:'Deep Clean',          desc:'Top-to-bottom overhaul',       price:'From KES 6,500' },
-  { id:4, ic:'🔨', name:'Post-Construction', desc:'Site cleanup & dust removal',  price:'From KES 12,000'},
-  { id:5, ic:'🔄', name:'Maintenance',        desc:'Scheduled recurring cleans',   price:'From KES 2,800' },
-  { id:6, ic:'📦', name:'Move In/Out',        desc:'Complete property preparation',price:'From KES 5,000' },
+  { id:1, ic:'🏠', name:'Residential',       desc:'Homes & apartments',          price:'From KES 3,500',  priceKES: 3500 },
+  { id:2, ic:'🏢', name:'Commercial',         desc:'Offices & workspaces',         price:'From KES 8,000',  priceKES: 8000 },
+  { id:3, ic:'✨', name:'Deep Clean',          desc:'Top-to-bottom overhaul',       price:'From KES 6,500',  priceKES: 6500 },
+  { id:4, ic:'🔨', name:'Post-Construction', desc:'Site cleanup & dust removal',  price:'From KES 12,000', priceKES: 12000},
+  { id:5, ic:'🔄', name:'Maintenance',        desc:'Scheduled recurring cleans',   price:'From KES 2,800',  priceKES: 2800 },
+  { id:6, ic:'📦', name:'Move In/Out',        desc:'Complete property preparation',price:'From KES 5,000',  priceKES: 5000 },
 ];
 
 const TIMES = ['8:00 AM','9:00 AM','10:00 AM','11:00 AM','12:00 PM','2:00 PM','3:00 PM','4:00 PM'];
@@ -113,6 +117,8 @@ const ADS = [
 
 const SVC_POINTS = { 1:350, 2:800, 3:650, 4:1200, 5:280, 6:500 };
 
+const formatKES = (amount) => amount ? new Intl.NumberFormat('en-KE').format(amount) : '0';
+
 const REWARDS = [
   { id:1, pts:500,   label:'KES 250 Discount',      desc:'Off your next booking',         ic:'💰' },
   { id:2, pts:1000,  label:'KES 500 Discount',       desc:'Off your next booking',         ic:'💳' },
@@ -121,6 +127,25 @@ const REWARDS = [
   { id:5, pts:8000,  label:'Free Deep Clean',         desc:'Top-to-bottom, on us',          ic:'✨' },
   { id:6, pts:12000, label:'Free Commercial Clean',   desc:'Full commercial service free',  ic:'🏢' },
 ];
+
+/* ─── Step progress bar ─── */
+const StepBar = ({ step }) => (
+  <div style={{ display:'flex', alignItems:'center', padding:'18px 24px 6px' }}>
+    {[['Book',1],['Review',2],['Pay',3]].map(([label, n], i, arr) => (
+      <React.Fragment key={n}>
+        <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:3 }}>
+          <div style={{ width:26, height:26, borderRadius:13, background:step>=n?G:CARD2, border:`2px solid ${step>=n?G:BO}`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:step>=n?'#000':MU, transition:'all 0.2s' }}>
+            {step > n ? '✓' : n}
+          </div>
+          <div style={{ fontSize:9, color:step===n?G:step>n?G:MU, fontWeight:step===n?700:400, letterSpacing:0.5 }}>{label.toUpperCase()}</div>
+        </div>
+        {i < arr.length - 1 && (
+          <div style={{ flex:1, height:2, background:step>i+1?G:BO, margin:'0 6px', marginBottom:14, transition:'background 0.3s' }}/>
+        )}
+      </React.Fragment>
+    ))}
+  </div>
+);
 
 /* ─── Reusable styled input ─── */
 const Inp = ({ placeholder, value, onChange, type='text', err=false, rows }) => {
@@ -522,6 +547,152 @@ function Account({ user, saveUser, go, theme, setTheme }) {
   );
 }
 
+/* ─── PAYMENTS SCREEN ─── */
+function Payments({ bookings, saveBookings, go }) {
+  const [activeId,  setActiveId]  = React.useState(null);
+  const [stkPhone,  setStkPhone]  = React.useState('');
+  const [stkState,  setStkState]  = React.useState('idle');
+  const [stkCid,    setStkCid]    = React.useState('');
+  const [stkError,  setStkError]  = React.useState('');
+
+  const fmtPhone = (p) => {
+    let n = (p||'').replace(/[\s\-()]/g,'');
+    if (n.startsWith('+254')) n = n.slice(1);
+    else if (n.startsWith('0')) n = '254'+n.slice(1);
+    else if (!n.startsWith('254')) n = '254'+n;
+    return n;
+  };
+
+  const openPay = (b) => {
+    setActiveId(b.id); setStkState('idle');
+    setStkPhone(b.phone||''); setStkError(''); setStkCid(b.checkoutId||'');
+  };
+
+  const pay = async (b) => {
+    const phone = fmtPhone(stkPhone||b.phone||'');
+    if (!phone||phone.length<12) { setStkError('Enter a valid Safaricom number'); return; }
+    setStkState('sending'); setStkError('');
+    try {
+      const res  = await fetch(`${CONFIG.darajaApi}/api/stkpush`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({phone,amount:b.amount,accountRef:`OHK-${(b.name||'BOOK').split(' ')[0].toUpperCase().slice(0,8)}`})});
+      const data = await res.json();
+      if (data.ResponseCode==='0') {
+        setStkCid(data.CheckoutRequestID); setStkState('sent');
+        saveBookings(bookings.map(x=>x.id===b.id?{...x,checkoutId:data.CheckoutRequestID}:x));
+      } else { setStkState('error'); setStkError(data.errorMessage||'STK push failed'); }
+    } catch { setStkState('error'); setStkError('Cannot reach payment server'); }
+  };
+
+  const verify = async (b) => {
+    const cid = stkCid||b.checkoutId;
+    if (!cid) return;
+    setStkState('checking');
+    try {
+      const res  = await fetch(`${CONFIG.darajaApi}/api/stkquery`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({checkoutRequestId:cid})});
+      const data = await res.json();
+      if (data.ResultCode==='0'||data.ResultCode===0) {
+        setStkState('paid');
+        saveBookings(bookings.map(x=>x.id===b.id?{...x,status:'paid',paidAt:new Date().toISOString().slice(0,10)}:x));
+      } else if (data.ResultCode!==undefined) { setStkState('error'); setStkError(data.ResultDesc||'Not confirmed'); }
+      else setStkState('sent');
+    } catch { setStkState('sent'); }
+  };
+
+  const pending = bookings.filter(b=>b.status==='pending');
+  const paid    = bookings.filter(b=>b.status==='paid');
+
+  if (!bookings.length) return (
+    <div style={{padding:'64px 24px',textAlign:'center'}}>
+      <div style={{fontSize:52,marginBottom:16}}>💳</div>
+      <h2 style={{fontSize:22,fontWeight:800,color:TX,marginBottom:10}}>No Payments Yet</h2>
+      <p style={{fontSize:13,color:MU,lineHeight:1.75,marginBottom:28}}>Your payment history will appear here once you book a service.</p>
+      <button className="ox-btn" onClick={()=>go('book')} style={{padding:'13px 28px',background:G,borderRadius:12,color:'#000',fontSize:14,fontWeight:700}}>Book a Service →</button>
+    </div>
+  );
+
+  return (
+    <div style={{padding:'24px 22px 48px'}}>
+      <div style={{fontSize:9,color:G,letterSpacing:2,textTransform:'uppercase',marginBottom:4}}>Transactions</div>
+      <h2 style={{fontSize:24,fontWeight:800,color:TX,marginBottom:20,letterSpacing:-0.3}}>Payments</h2>
+
+      {pending.length>0 && (
+        <>
+          <div style={{fontSize:11,color:MU,textTransform:'uppercase',letterSpacing:1,marginBottom:10}}>Pending</div>
+          {pending.map(b=>(
+            <div key={b.id} style={{background:CARD,border:`1px solid #e24b4a44`,borderRadius:14,padding:'14px',marginBottom:10}}>
+              <div style={{display:'flex',alignItems:'center',gap:10,marginBottom:10}}>
+                <span style={{fontSize:22}}>{SVCS.find(s=>s.id===b.serviceId)?.ic||'🧹'}</span>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:13,fontWeight:700,color:TX}}>{b.service}</div>
+                  <div style={{fontSize:11,color:MU}}>{b.date} · {b.time}</div>
+                </div>
+                <div style={{fontSize:14,fontWeight:800,color:G}}>KES {formatKES(b.amount)}</div>
+              </div>
+              <div style={{fontSize:11,color:'#e24b4a',marginBottom:10,display:'flex',alignItems:'center',gap:5}}>
+                <span style={{width:6,height:6,borderRadius:'50%',background:'#e24b4a',display:'inline-block'}}/>
+                Awaiting payment
+              </div>
+              {activeId===b.id ? (
+                stkState==='paid' ? (
+                  <div style={{textAlign:'center',padding:'10px 0'}}>
+                    <div style={{fontSize:28,marginBottom:4}}>✅</div>
+                    <div style={{fontSize:13,fontWeight:700,color:OK}}>Payment Confirmed!</div>
+                  </div>
+                ) : (stkState==='sent'||stkState==='checking') ? (
+                  <div>
+                    <div style={{background:`${OK}12`,border:`1px solid ${OK}44`,borderRadius:9,padding:'10px',marginBottom:8,textAlign:'center'}}>
+                      <div style={{fontSize:12,fontWeight:700,color:OK}}>📲 Prompt sent — enter your M-Pesa PIN</div>
+                    </div>
+                    <button className="ox-btn" onClick={()=>verify(b)} disabled={stkState==='checking'}
+                      style={{width:'100%',padding:'11px',background:stkState==='checking'?CARD2:G,borderRadius:9,color:stkState==='checking'?MU:'#000',fontSize:12,fontWeight:700,cursor:stkState==='checking'?'not-allowed':'pointer',marginBottom:5}}>
+                      {stkState==='checking'?'Verifying...':"I've Paid — Verify"}
+                    </button>
+                    <button onClick={()=>{setStkState('idle');setActiveId(null);}} style={{width:'100%',padding:'7px',background:'none',border:'none',color:MU,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+                  </div>
+                ) : (
+                  <div>
+                    <input type="tel" placeholder={`Safaricom number (e.g. ${b.phone||'0712 345 678'})`}
+                      value={stkPhone} onChange={e=>{setStkPhone(e.target.value);setStkError('');}}
+                      style={{display:'block',width:'100%',padding:'10px 12px',marginBottom:stkError?3:7,background:CARD2,border:`1px solid ${stkError?'#e24b4a':BO}`,borderRadius:8,color:TX,fontSize:12,outline:'none',fontFamily:'inherit'}}/>
+                    {stkError&&<div style={{fontSize:10,color:'#e24b4a',marginBottom:6}}>{stkError}</div>}
+                    <button className="ox-btn" onClick={()=>pay(b)} disabled={stkState==='sending'}
+                      style={{width:'100%',padding:'11px',background:stkState==='sending'?GD:G,borderRadius:9,color:'#000',fontSize:12,fontWeight:700,cursor:stkState==='sending'?'not-allowed':'pointer',marginBottom:5}}>
+                      {stkState==='sending'?'Sending...':`Pay KES ${formatKES(b.amount)} — STK Push`}
+                    </button>
+                    <button onClick={()=>{setActiveId(null);setStkState('idle');setStkError('');}} style={{width:'100%',padding:'7px',background:'none',border:'none',color:MU,fontSize:11,cursor:'pointer',fontFamily:'inherit'}}>Cancel</button>
+                  </div>
+                )
+              ) : (
+                <button className="ox-btn" onClick={()=>openPay(b)}
+                  style={{width:'100%',padding:'11px',background:G,borderRadius:9,color:'#000',fontSize:12,fontWeight:700,cursor:'pointer'}}>
+                  Pay Now →
+                </button>
+              )}
+            </div>
+          ))}
+        </>
+      )}
+
+      {paid.length>0 && (
+        <>
+          <div style={{fontSize:11,color:MU,textTransform:'uppercase',letterSpacing:1,marginBottom:10,marginTop:pending.length?16:0}}>Payment History</div>
+          <div style={{background:CARD,border:`1px solid ${BO}`,borderRadius:14,overflow:'hidden'}}>
+            {paid.map((b,i)=>(
+              <div key={b.id} style={{display:'flex',alignItems:'center',gap:10,padding:'12px 14px',borderBottom:i<paid.length-1?`1px solid ${BO}`:'none'}}>
+                <div style={{width:34,height:34,borderRadius:17,background:`${OK}18`,display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0}}>✅</div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:12,fontWeight:600,color:TX}}>{b.service}</div>
+                  <div style={{fontSize:10,color:MU}}>{b.paidAt||b.date}</div>
+                </div>
+                <div style={{fontSize:13,fontWeight:700,color:OK}}>KES {formatKES(b.amount)}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 /* ─── Main App ─── */
 function App() {
   const [screen, setScreen]   = useState('landing');
@@ -535,6 +706,15 @@ function App() {
   const [aiLoad,  setAiLoad]  = useState(false);
   const [user,    setUser]    = useState(() => { try { return JSON.parse(localStorage.getItem('onyxhawk_user')) || null; } catch { return null; } });
   const [lastPts, setLastPts] = useState(0);
+  const [copied,  setCopied]  = useState(false);
+  const [stkState,      setStkState]      = useState('idle'); // idle | sending | sent | checking | success | error
+  const [stkCheckoutId, setStkCheckoutId] = useState('');
+  const [stkPhone,      setStkPhone]      = useState('');
+  const [stkError,      setStkError]      = useState('');
+  const [bookings,      setBookings]      = useState(() => { try { return JSON.parse(localStorage.getItem('onyxhawk_bookings'))||[]; } catch { return []; } });
+  const [currentBid,    setCurrentBid]    = useState(null);
+
+  const saveBookings = (bs) => { setBookings(bs); localStorage.setItem('onyxhawk_bookings', JSON.stringify(bs)); };
   const [theme,   setThemeRaw] = useState(() => {
     const saved = localStorage.getItem('onyxhawk_theme') || 'dark';
     if (saved === 'light') document.body.classList.add('light-mode');
@@ -580,8 +760,16 @@ function App() {
     return !Object.keys(e).length;
   };
 
+  const goToReview = () => {
+    if (!selSvc || !validate()) return;
+    go('review');
+  };
+
   const submit = () => {
     if (!selSvc || !validate()) return;
+    const bid = Date.now();
+    setCurrentBid(bid);
+    saveBookings([{ id:bid, service:selSvc.name, serviceId:selSvc.id, amount:selSvc.priceKES, name:form.name, phone:form.phone, date:form.date, time:form.time, location:form.location, notes:form.notes, status:'pending', bookedAt:new Date().toISOString().slice(0,10), paidAt:null, checkoutId:null }, ...bookings]);
     if (user) {
       const pts = SVC_POINTS[selSvc.id] || 100;
       const now = new Date().toISOString().split('T')[0];
@@ -593,7 +781,87 @@ function App() {
       });
       setLastPts(pts);
     }
+    setStkState('idle');
+    setStkCheckoutId('');
+    setStkPhone(form.phone || user?.phone || '');
+    setStkError('');
     go('confirm');
+  };
+
+  const mpesaAmount = selSvc?.priceKES || 0;
+  const mpesaAccount = user?.phone || form.phone || 'Customer';
+  const mpesaText = `Paybill: ${CONFIG.mpesaPaybill}\nAccount: ${mpesaAccount}\nAmount: KES ${formatKES(mpesaAmount)}\nService: ${selSvc?.name || CONFIG.mpesaBusiness}`;
+  const mpesaDial = `tel:${encodeURIComponent('*334#')}`;
+
+  const copyMpesaDetails = async () => {
+    try {
+      await navigator.clipboard.writeText(mpesaText);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (e) {
+      window.prompt('Copy these M-Pesa details:', mpesaText);
+    }
+  };
+
+  const formatDarajaPhone = (p) => {
+    let n = (p || '').replace(/[\s\-()]/g, '');
+    if (n.startsWith('+254')) n = n.slice(1);
+    else if (n.startsWith('0')) n = '254' + n.slice(1);
+    else if (!n.startsWith('254')) n = '254' + n;
+    return n;
+  };
+
+  const initiateStkPush = async () => {
+    const phone = formatDarajaPhone(stkPhone || form.phone || user?.phone || '');
+    if (!phone || phone.length < 12) { setStkError('Enter a valid Safaricom number'); return; }
+    setStkState('sending'); setStkError('');
+    try {
+      const res = await fetch(`${CONFIG.darajaApi}/api/stkpush`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          phone,
+          amount: selSvc?.priceKES || 1,
+          accountRef: `OHK-${(form.name || 'BOOK').split(' ')[0].toUpperCase().slice(0, 8)}`,
+        }),
+      });
+      const data = await res.json();
+      if (data.ResponseCode === '0') {
+        setStkCheckoutId(data.CheckoutRequestID);
+        setStkState('sent');
+        if (currentBid) saveBookings(bookings.map(b => b.id===currentBid ? {...b, checkoutId:data.CheckoutRequestID} : b));
+      } else {
+        setStkState('error');
+        setStkError(data.errorMessage || data.ResponseDescription || 'STK push failed. Try again.');
+      }
+    } catch {
+      setStkState('error');
+      setStkError('Cannot reach the payment server. Make sure server.js is running.');
+    }
+  };
+
+  const queryStkStatus = async () => {
+    if (!stkCheckoutId) return;
+    setStkState('checking');
+    try {
+      const res = await fetch(`${CONFIG.darajaApi}/api/stkquery`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ checkoutRequestId: stkCheckoutId }),
+      });
+      const data = await res.json();
+      if (data.ResultCode === '0' || data.ResultCode === 0) {
+        setStkState('success');
+        if (currentBid) saveBookings(bookings.map(b => b.id===currentBid ? {...b, status:'paid', paidAt:new Date().toISOString().slice(0,10)} : b));
+      } else if (data.ResultCode !== undefined) {
+        setStkState('error');
+        setStkError(data.ResultDesc || 'Payment not confirmed. Check and retry.');
+      } else {
+        setStkState('sent');
+      }
+    } catch {
+      setStkState('sent');
+    }
   };
 
   const sendMsg = async () => {
@@ -759,7 +1027,9 @@ function App() {
 
   /* ─── BOOK ─── */
   const Book = () => (
-    <div style={{ padding:'22px' }}>
+    <div>
+      <StepBar step={1}/>
+      <div style={{ padding:'10px 22px 22px' }}>
       <button onClick={() => go('services')} style={{ background:'none', border:'none', color:MU, cursor:'pointer', padding:0, marginBottom:16, fontSize:13, display:'flex', alignItems:'center', gap:4 }}>
         ← Services
       </button>
@@ -809,10 +1079,11 @@ function App() {
       <Inp placeholder="Address / Location" value={form.location} onChange={e=>upd('location',e.target.value)} err={errs.location} rows={2}/>
       <Inp placeholder="Additional notes (optional)" value={form.notes} onChange={e=>setForm(p=>({...p,notes:e.target.value}))} rows={2}/>
 
-      <button className="ox-btn" onClick={submit} style={{ width:'100%', padding:'15px', background:selSvc?G:CARD2, border:`1px solid ${selSvc?G:BO}`, borderRadius:12, color:selSvc?'#000':MU, fontSize:14, fontWeight:700, marginTop:8 }}>
-        {selSvc ? `Book ${selSvc.name} →` : 'Select a Service First'}
+      <button className="ox-btn" onClick={goToReview} style={{ width:'100%', padding:'15px', background:selSvc?G:CARD2, border:`1px solid ${selSvc?G:BO}`, borderRadius:12, color:selSvc?'#000':MU, fontSize:14, fontWeight:700, marginTop:8 }}>
+        {selSvc ? 'Review Booking →' : 'Select a Service First'}
       </button>
       <p style={{ textAlign:'center', fontSize:11, color:MU, marginTop:10, marginBottom:28 }}>We confirm within 30 minutes via WhatsApp</p>
+      </div>
     </div>
   );
 
@@ -870,13 +1141,55 @@ function App() {
     </>
   );
 
+  /* ─── REVIEW ─── */
+  const Review = () => (
+    <div>
+      <StepBar step={2}/>
+      <div style={{ padding:'12px 24px 40px' }}>
+        <button onClick={() => go('book')} style={{ background:'none', border:'none', color:MU, cursor:'pointer', padding:0, marginBottom:16, fontSize:13, display:'flex', alignItems:'center', gap:4 }}>
+          ← Edit Details
+        </button>
+        <h2 style={{ fontSize:22, fontWeight:800, color:TX, marginBottom:18, letterSpacing:-0.3 }}>Review Booking</h2>
+        <div style={{ background:CARD, border:`1px solid ${G}44`, borderRadius:14, padding:'14px 16px', marginBottom:12, display:'flex', alignItems:'center', gap:12 }}>
+          <span style={{ fontSize:28 }}>{selSvc?.ic}</span>
+          <div style={{ flex:1 }}>
+            <div style={{ fontSize:15, fontWeight:700, color:TX }}>{selSvc?.name}</div>
+            <div style={{ fontSize:11, color:MU }}>{selSvc?.desc}</div>
+          </div>
+          <div style={{ fontSize:15, fontWeight:800, color:G }}>KES {formatKES(selSvc?.priceKES)}</div>
+        </div>
+        <div style={{ background:CARD, border:`1px solid ${BO}`, borderRadius:14, padding:'4px 16px', marginBottom:16 }}>
+          {[['Name',form.name],['Phone',form.phone],['Date',form.date],['Time',form.time],['Location',form.location],form.notes?['Notes',form.notes]:null].filter(Boolean).filter(([,v])=>v).map(([l,v],i,arr) => (
+            <div key={l} style={{ display:'flex', justifyContent:'space-between', alignItems:'center', padding:'10px 0', borderBottom:i<arr.length-1?`1px solid ${BO}`:'none' }}>
+              <span style={{ fontSize:12, color:MU }}>{l}</span>
+              <span style={{ fontSize:12, color:TX, fontWeight:500, textAlign:'right', maxWidth:'58%' }}>{v}</span>
+            </div>
+          ))}
+        </div>
+        {user && (
+          <div style={{ background:`${G}12`, border:`1px solid ${G}33`, borderRadius:12, padding:'12px 14px', marginBottom:18, display:'flex', alignItems:'center', gap:10 }}>
+            <span style={{ fontSize:20 }}>⭐</span>
+            <span style={{ fontSize:12, color:TX }}>You'll earn <strong style={{ color:G }}>{(SVC_POINTS[selSvc?.id]||100).toLocaleString()} pts</strong> for this booking</span>
+          </div>
+        )}
+        <button className="ox-btn" onClick={submit}
+          style={{ width:'100%', padding:'15px', background:G, borderRadius:12, color:'#000', fontSize:15, fontWeight:800, marginBottom:8 }}>
+          Confirm &amp; Pay →
+        </button>
+        <p style={{ textAlign:'center', fontSize:11, color:MU }}>We confirm within 30 minutes via WhatsApp</p>
+      </div>
+    </div>
+  );
+
   /* ─── CONFIRM ─── */
   const Confirm = () => (
-    <div style={{ padding:'36px 24px', textAlign:'center' }}>
-      <div style={{ width:72, height:72, borderRadius:36, background:`${OK}18`, border:`2px solid ${OK}`, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 20px', fontSize:34 }}>✓</div>
-      <h2 style={{ fontSize:24, fontWeight:800, color:TX, marginBottom:10 }}>Booking Sent!</h2>
-      <p style={{ fontSize:13, color:MU, marginBottom:26, lineHeight:1.65 }}>
-        We'll confirm your booking within 30 minutes via phone or WhatsApp. Thank you for choosing Onyxhawk!
+    <div>
+      <StepBar step={3}/>
+      <div style={{ padding:'16px 24px 36px', textAlign:'center' }}>
+      <div style={{ width:66, height:66, borderRadius:33, background:`${OK}18`, border:`2px solid ${OK}`, display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 14px', fontSize:30 }}>✓</div>
+      <h2 style={{ fontSize:22, fontWeight:800, color:TX, marginBottom:8 }}>Booking Confirmed!</h2>
+      <p style={{ fontSize:13, color:MU, marginBottom:20, lineHeight:1.65 }}>
+        Complete your payment below. We'll confirm within 30 minutes via WhatsApp.
       </p>
 
       <div style={{ background:CARD, border:`1px solid ${BO}`, borderRadius:14, padding:'16px', textAlign:'left', marginBottom:20 }}>
@@ -901,14 +1214,76 @@ function App() {
         </div>
       )}
 
+      <div style={{ background:CARD, border:`1px solid ${BO}`, borderRadius:14, padding:'16px', marginBottom:16 }}>
+        <div style={{ fontSize:11, color:G, letterSpacing:2, textTransform:'uppercase', marginBottom:12 }}>Pay with M-Pesa</div>
+
+        {/* ── STK Push ── */}
+        {stkState === 'success' ? (
+          <div style={{ textAlign:'center', padding:'10px 0 8px' }}>
+            <div style={{ fontSize:36, marginBottom:8 }}>✅</div>
+            <div style={{ fontSize:15, fontWeight:700, color:OK }}>Payment Confirmed!</div>
+            <div style={{ fontSize:12, color:MU, marginTop:4 }}>KES {formatKES(mpesaAmount)} received. Thank you!</div>
+          </div>
+        ) : (stkState === 'sent' || stkState === 'checking') ? (
+          <div>
+            <div style={{ background:`${OK}12`, border:`1px solid ${OK}44`, borderRadius:10, padding:'12px', marginBottom:10, textAlign:'center' }}>
+              <div style={{ fontSize:14, fontWeight:700, color:OK }}>📲 Prompt sent!</div>
+              <div style={{ fontSize:12, color:TX, marginTop:4 }}>Enter your M-Pesa PIN to complete payment</div>
+              <div style={{ fontSize:11, color:MU, marginTop:3 }}>{formatDarajaPhone(stkPhone || form.phone)}</div>
+            </div>
+            <button className="ox-btn" onClick={queryStkStatus} disabled={stkState === 'checking'}
+              style={{ width:'100%', padding:'12px', background:stkState==='checking'?CARD2:G, borderRadius:10, color:stkState==='checking'?MU:'#000', fontSize:13, fontWeight:700, cursor:stkState==='checking'?'not-allowed':'pointer', marginBottom:6 }}>
+              {stkState === 'checking' ? 'Verifying...' : "I've Paid — Verify"}
+            </button>
+            <button onClick={() => setStkState('idle')}
+              style={{ width:'100%', padding:'8px', background:'none', border:'none', color:MU, fontSize:12, cursor:'pointer', fontFamily:'inherit' }}>
+              Resend / Change number
+            </button>
+          </div>
+        ) : (
+          <div>
+            <div style={{ fontSize:12, color:MU, marginBottom:8 }}>Send a payment prompt to your Safaricom number:</div>
+            <input type="tel" placeholder="e.g. 0712 345 678"
+              value={stkPhone} onChange={e => { setStkPhone(e.target.value); setStkError(''); }}
+              style={{ display:'block', width:'100%', padding:'11px 13px', marginBottom: stkError ? 4 : 8, background:CARD2, border:`1px solid ${stkError?'#e24b4a':BO}`, borderRadius:9, color:TX, fontSize:13, outline:'none', fontFamily:'inherit' }}/>
+            {stkError && <div style={{ fontSize:11, color:'#e24b4a', marginBottom:8 }}>{stkError}</div>}
+            <button className="ox-btn" onClick={initiateStkPush} disabled={stkState === 'sending'}
+              style={{ width:'100%', padding:'13px', background:stkState==='sending'?GD:G, borderRadius:10, color:'#000', fontSize:13, fontWeight:700, cursor:stkState==='sending'?'not-allowed':'pointer' }}>
+              {stkState === 'sending' ? 'Sending...' : `Pay KES ${formatKES(mpesaAmount)} — STK Push`}
+            </button>
+          </div>
+        )}
+
+        {/* ── Manual Paybill fallback ── */}
+        {stkState !== 'success' && (
+          <div style={{ marginTop:12, paddingTop:12, borderTop:`1px solid ${BO}` }}>
+            <div style={{ fontSize:10, color:MU, letterSpacing:1, marginBottom:8 }}>OR PAY MANUALLY (PAYBILL):</div>
+            <div style={{ display:'grid', gap:5, marginBottom:10 }}>
+              <div style={{ fontSize:12, color:TX }}>Paybill: <strong>{CONFIG.mpesaPaybill}</strong></div>
+              <div style={{ fontSize:12, color:TX }}>Account: <strong>{mpesaAccount}</strong></div>
+              <div style={{ fontSize:12, color:TX }}>Amount: <strong>KES {formatKES(mpesaAmount)}</strong></div>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <a href={mpesaDial} style={{ flex:1, textAlign:'center', textDecoration:'none', padding:'10px', background:'transparent', border:`1px solid ${BO}`, borderRadius:9, color:TX, fontSize:12, fontWeight:600 }}>
+                Open M-Pesa
+              </a>
+              <button className="ox-btn" onClick={copyMpesaDetails}
+                style={{ flex:1, padding:'10px', background:'transparent', border:`1px solid ${BO}`, borderRadius:9, color:TX, fontSize:12, fontWeight:600, cursor:'pointer' }}>
+                {copied ? 'Copied!' : 'Copy Details'}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
       <a href={`https://wa.me/${CONFIG.whatsapp}?text=Hi%20Onyxhawk%2C%20I%20just%20booked%20${encodeURIComponent(selSvc?.name||'')}%20for%20${encodeURIComponent(form.date)}%20at%20${encodeURIComponent(form.time)}.%20My%20name%20is%20${encodeURIComponent(form.name)}.`}
         target="_blank" rel="noopener" style={{ display:'block', width:'100%', padding:'14px', background:'#25d366', borderRadius:12, color:'#fff', fontSize:14, fontWeight:700, textDecoration:'none', marginBottom:10 }}>
         💬 Confirm on WhatsApp
       </a>
-      <button className="ox-btn" onClick={() => { go('home'); setForm({name:'',phone:'',email:'',date:'',time:'',location:'',notes:''}); setSelSvc(null); setErrs({}); }}
+      <button className="ox-btn" onClick={() => { go('home'); setForm({name:'',phone:'',email:'',date:'',time:'',location:'',notes:''}); setSelSvc(null); setErrs({}); setStkState('idle'); setStkCheckoutId(''); setStkPhone(''); setStkError(''); }}
         style={{ width:'100%', padding:'14px', background:'transparent', border:`1px solid ${BO}`, borderRadius:12, color:TX, fontSize:14, cursor:'pointer' }}>
         Back to Home
       </button>
+      </div>
     </div>
   );
 
@@ -916,6 +1291,7 @@ function App() {
   const NAV = [
     { id:'home',     ic:'🏠', lb:'Home'    },
     { id:'book',     ic:'📅', lb:'Book'    },
+    { id:'payments', ic:'💳', lb:'Pay'     },
     { id:'chat',     ic:'🤖', lb:'Hawk AI' },
     { id:'rewards',  ic:'⭐', lb:'Rewards' },
     { id:'account',  ic:'👤', lb:'Account' },
@@ -936,11 +1312,13 @@ function App() {
         {screen === 'home'     && <Home/>}
         {screen === 'services' && <Services/>}
         {screen === 'book'     && <Book/>}
+        {screen === 'payments' && <Payments bookings={bookings} saveBookings={saveBookings} go={go}/>}
+        {screen === 'review'   && <Review/>}
         {screen === 'chat'     && <Chat/>}
         {screen === 'confirm'  && <Confirm/>}
       </div>
 
-      {!['confirm','landing','signin','signup','cleaner'].includes(screen) && (
+      {!['confirm','review','landing','signin','signup','cleaner'].includes(screen) && (
         <nav className="bottom-nav">
           {NAV.map(({ id, ic, lb }) => {
             const active = screen === id;
